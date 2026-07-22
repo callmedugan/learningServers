@@ -10,11 +10,30 @@ async function handlerReadiness(req: Request, res: Response): Promise<void>{
     res.send("OK");
 }
 
-app.get("/healthz", handlerReadiness);
+async function middlewareLogResponses(req: Request, res: Response, next: Function){
+    res.on("finish", () => {
+        const code = res.statusCode;
+        if(code < 200 || code >= 400){
+            console.log(`[NON-OK] ${req.method} ${req.url} - Status: ${code}`)
+        }
+    })
+    //run next middleware
+    next();
+}
 
-//serves the index.html etc. from the path given
-app.use("/app", express.static("./src/app"));
+async function main() {
+    //set middleware at app level
+    app.use(middlewareLogResponses);
 
-app.listen(PORT, () => {
-  console.log(`Server is running at http://localhost:${PORT}`);
-});
+    //for readiness
+    app.get("/healthz", handlerReadiness);
+
+    //serves the index.html etc. from the path given
+    app.use("/app", express.static("./src/app"));
+
+    app.listen(PORT, () => {
+    console.log(`Server is running at http://localhost:${PORT}`);
+    });
+}
+
+await main();
