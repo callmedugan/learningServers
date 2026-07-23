@@ -71,16 +71,12 @@ async function handlerValidateChirp(req: Request, res: Response) {
 	const body: Shape = req.body;
 
 	//handle the parsed data
-	try {
-		if (body?.body.length > 140) {
-			throw new Error("Chirp is too long");
-		} else {
-			res.status(200).send({
-				cleanedBody: getCleanedChirp(body.body),
-			});
-		}
-	} catch (err) {
-		throw new Error("Something went wrong on our end");
+	if (body?.body.length > 140) {
+		throw new BadRequestError("Chirp is too long. Max length is 140");
+	} else {
+		res.status(200).send({
+			cleanedBody: getCleanedChirp(body.body),
+		});
 	}
 }
 
@@ -91,9 +87,72 @@ async function errorHandler(
 	next: NextFunction,
 ) {
 	console.log(err.message);
-	res.status(500).json({
-		error: "Something went wrong on our end",
+	//default to 500
+	let status = 500;
+	let message = "Something went wrong on our end";
+	if (err instanceof BadRequestError) {
+		status = 400;
+		message = err.message;
+	} else if (err instanceof UnauthorizedError) {
+		status = 401;
+		message = err.message;
+	} else if (err instanceof ForbiddenError) {
+		status = 403;
+		message = err.message;
+	} else if (err instanceof NotFoundError) {
+		status = 404;
+		message = err.message;
+	}
+	res.status(status).json({
+		error: message,
 	});
+}
+
+//other////////////////////////////////////////////////////////////////////////////////
+
+//400
+class BadRequestError extends Error {
+	constructor(message: string) {
+		super(message);
+	}
+}
+
+//401
+class UnauthorizedError extends Error {
+	constructor(message: string) {
+		super(message);
+	}
+}
+
+//403
+class ForbiddenError extends Error {
+	constructor(message: string) {
+		super(message);
+	}
+}
+
+//404
+class NotFoundError extends Error {
+	constructor(message: string) {
+		super(message);
+	}
+}
+
+//helper to filter out words in a Chirp
+function getCleanedChirp(input: string): string {
+	const split = input.split(" ");
+	for (let i = 0; i < split.length; i++) {
+		switch (split[i].toLowerCase()) {
+			case "kerfuffle":
+			case "sharbert":
+			case "fornax":
+				split[i] = "****";
+				break;
+			default:
+				break;
+		}
+	}
+	return split.join(" ");
 }
 
 //main////////////////////////////////////////////////////////////////////////////////
@@ -127,22 +186,3 @@ async function main() {
 }
 
 await main();
-
-//other////////////////////////////////////////////////////////////////////////////////
-
-//helper to filter out words in a Chirp
-function getCleanedChirp(input: string): string {
-	const split = input.split(" ");
-	for (let i = 0; i < split.length; i++) {
-		switch (split[i].toLowerCase()) {
-			case "kerfuffle":
-			case "sharbert":
-			case "fornax":
-				split[i] = "****";
-				break;
-			default:
-				break;
-		}
-	}
-	return split.join(" ");
-}
