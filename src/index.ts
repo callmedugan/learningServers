@@ -4,17 +4,12 @@ import { config } from "./config.js";
 import postgres from "postgres";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { drizzle } from "drizzle-orm/postgres-js";
+import { createUser, deleteAll } from "./db/queries/users.js";
 
 const app = express();
 const PORT = 8080;
 
 //onStart/////////////////////////////////////////////////////////////////////////////
-
-//on startup check env vars
-process.loadEnvFile();
-if (process.env.DB_URL == null) {
-	throw new Error("env variable missing");
-}
 
 //on start create a client to run the migrations
 const migrationClient = postgres(config.db.URL, { max: 1 });
@@ -68,11 +63,43 @@ async function handlerWriteRequestCount(req: Request, res: Response) {
 	res.status(200);
 }
 
-async function handlerResetRequestCount(req: Request, res: Response) {
+async function handlerReset(req: Request, res: Response) {
 	res.set("Content-Type", "text/plain; charset=utf-8");
-	config.fileserverHits = 0;
-	res.send("Hits: " + 0 + "\n");
-	res.status(200);
+	if (config.platform !== "dev") {
+		res.status(403);
+	} else {
+		config.fileserverHits = 0;
+		const deleted = await deleteAll();
+		res.send("Reset complete");
+		res.status(200);
+	}
+}
+
+async function handlerCreateUser(req: Request, res: Response) {
+	//define shape
+	type Shape = {
+		email: string;
+	};
+
+	//get parsed body
+	const parse: Shape = req.body;
+
+	//handle the parsed data
+	if (!parse.email || parse.email === "") {
+		throw new BadRequestError("Email cannot be blank");
+	}
+	//result
+	const result = await createUser({ email: parse.email });
+	if (result == undefined) {
+		throw new Error("something went wrong creating the user");
+	}
+	//return 201 status with result
+	res.status(201).send({
+		id: result.id,
+		email: result.email,
+		createdAt: result.createdAt,
+		updatedAt: result.updatedAt,
+	});
 }
 
 //handler to validate that a chirp is 140 chars or less
@@ -83,14 +110,14 @@ async function handlerValidateChirp(req: Request, res: Response) {
 	};
 
 	//get parsed body
-	const body: Shape = req.body;
+	const parse: Shape = req.body;
 
 	//handle the parsed data
-	if (body?.body.length > 140) {
+	if (parse?.body.length > 140) {
 		throw new BadRequestError("Chirp is too long. Max length is 140");
 	} else {
 		res.status(200).send({
-			cleanedBody: getCleanedChirp(body.body),
+			cleanedBody: getCleanedChirp(parse.body),
 		});
 	}
 }
@@ -182,11 +209,12 @@ async function main() {
 
 	//admin
 	app.use("/admin/metrics", handlerWriteRequestCount);
-	app.post("/admin/reset", handlerResetRequestCount);
+	app.post("/admin/reset", handlerReset);
 
 	//api
 	app.get("/api/healthz", handlerReadiness);
 	app.post("/api/validate_chirp", handlerValidateChirp);
+	app.post("/api/users", handlerCreateUser);
 
 	//serves the index.html etc. from the path given
 	app.use("/app", express.static("./src/app"));
