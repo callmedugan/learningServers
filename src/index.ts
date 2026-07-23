@@ -73,19 +73,27 @@ async function handlerValidateChirp(req: Request, res: Response) {
 	//handle the parsed data
 	try {
 		if (body?.body.length > 140) {
-			res.status(400).send({
-				error: "Chirp is too long",
-			});
+			throw new Error("Chirp is too long");
 		} else {
 			res.status(200).send({
-				valid: true,
+				cleanedBody: getCleanedChirp(body.body),
 			});
 		}
 	} catch (err) {
-		res.status(400).send({
-			error: "Something went wrong",
-		});
+		throw new Error("Something went wrong on our end");
 	}
+}
+
+async function errorHandler(
+	err: Error,
+	req: Request,
+	res: Response,
+	next: NextFunction,
+) {
+	console.log(err.message);
+	res.status(500).json({
+		error: "Something went wrong on our end",
+	});
 }
 
 //main////////////////////////////////////////////////////////////////////////////////
@@ -109,6 +117,9 @@ async function main() {
 	//serves the index.html etc. from the path given
 	app.use("/app", express.static("./src/app"));
 
+	//error handlers go last
+	app.use(errorHandler);
+
 	//listen on 8080
 	app.listen(PORT, () => {
 		console.log(`Server is running at http://localhost:${PORT}`);
@@ -116,3 +127,22 @@ async function main() {
 }
 
 await main();
+
+//other////////////////////////////////////////////////////////////////////////////////
+
+//helper to filter out words in a Chirp
+function getCleanedChirp(input: string): string {
+	const split = input.split(" ");
+	for (let i = 0; i < split.length; i++) {
+		switch (split[i].toLowerCase()) {
+			case "kerfuffle":
+			case "sharbert":
+			case "fornax":
+				split[i] = "****";
+				break;
+			default:
+				break;
+		}
+	}
+	return split.join(" ");
+}
