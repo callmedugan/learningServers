@@ -32,9 +32,16 @@ async function handlerReadiness(req: Request, res: Response){
 }
 
 async function handlerWriteRequestCount(req: Request, res: Response){
-    res.set("Content-Type", "text/plain; charset=utf-8");
+    res.set("Content-Type", "text/html; charset=utf-8");
     const count:number = config.fileserverHits;
-    res.send("Hits: " + count);
+    res.send(
+        `<html>
+            <body>
+                <h1>Welcome, Chirpy Admin</h1>
+                <p>Chirpy has been visited ${count} times!</p>
+            </body>
+        </html>`
+    );
     res.status(200);
 }
 
@@ -51,8 +58,10 @@ async function main() {
     //set middleware
     app.use(middlewareLogResponses);
     app.use("/app", middlewareMetricsInc)
-    app.use("/api/metrics", handlerWriteRequestCount)
-    app.use("/api/reset", handlerResetRequestCount)
+    
+    //admin
+    app.use("/admin/metrics", handlerWriteRequestCount);
+    app.use("/admin/reset", handlerResetRequestCount)
 
     //for readiness
     app.get("/api/healthz", handlerReadiness);
