@@ -1,9 +1,24 @@
 import express, { NextFunction } from "express";
 import { Request, Response } from "express";
 import { config } from "./config.js";
+import postgres from "postgres";
+import { migrate } from "drizzle-orm/postgres-js/migrator";
+import { drizzle } from "drizzle-orm/postgres-js";
 
 const app = express();
 const PORT = 8080;
+
+//onStart/////////////////////////////////////////////////////////////////////////////
+
+//on startup check env vars
+process.loadEnvFile();
+if (process.env.DB_URL == null) {
+	throw new Error("env variable missing");
+}
+
+//on start create a client to run the migrations
+const migrationClient = postgres(config.db.URL, { max: 1 });
+await migrate(drizzle(migrationClient), config.db.migrationConfig);
 
 //middleware//////////////////////////////////////////////////////////////////////////
 
