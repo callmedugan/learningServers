@@ -5,8 +5,11 @@ import postgres from "postgres";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { createUser, deleteAll } from "./db/queries/users.js";
-import { createChirp, getAllChirps } from "./db/queries/chirps.js";
-import { ChirpRecord } from "./db/schema.js";
+import {
+	createChirp,
+	getAllChirps,
+	getChirpById,
+} from "./db/queries/chirps.js";
 
 const app = express();
 const PORT = 8080;
@@ -107,6 +110,9 @@ async function handlerCreateUser(req: Request, res: Response) {
 async function handlerGetAllChirps(req: Request, res: Response) {
 	//query
 	const chirps = await getAllChirps();
+	if (chirps == undefined) {
+		throw new NotFoundError("No chirps found");
+	}
 	const result = [];
 	//build result structure
 	for (const c of chirps) {
@@ -121,6 +127,25 @@ async function handlerGetAllChirps(req: Request, res: Response) {
 	//success
 	res.status(200);
 	res.send(result);
+}
+
+async function handlerGetChirpById(req: Request, res: Response) {
+	//get id from provided parameter in url. using ternary to fix string|string[] type issue with params
+	const chirpId = Array.isArray(req.params.chirpId) ? "" : req.params.chirpId;
+	//query
+	const result = await getChirpById(chirpId);
+	if (result == undefined) {
+		throw new NotFoundError("No chirp found with id: " + chirpId);
+	}
+	//success
+	res.status(200);
+	res.send({
+		id: result.id,
+		createdAt: result.createdAt,
+		updatedAt: result.updatedAt,
+		body: result.body,
+		userId: result.userId,
+	});
 }
 
 async function handlerCreateChirp(req: Request, res: Response) {
@@ -257,6 +282,7 @@ async function main() {
 	app.get("/api/healthz", handlerReadiness);
 	app.post("/api/users", handlerCreateUser);
 	app.get("/api/chirps", handlerGetAllChirps);
+	app.get("/api/chirps/:chirpId", handlerGetChirpById);
 	app.post("/api/chirps", handlerCreateChirp);
 
 	//serves the index.html etc. from the path given
