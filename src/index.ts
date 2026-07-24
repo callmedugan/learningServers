@@ -103,13 +103,13 @@ async function handlerLogin(req: Request, res: Response) {
 		throw new UnauthorizedError("incorrect email or password");
 
 	//auth
-	let isAuth = false;
+	let isAuthorized = false;
 	try {
-		isAuth = await checkPasswordHash(parse.password, user.hashedPassword);
+		isAuthorized = await checkPasswordHash(parse.password, user.hashedPassword);
 	} catch (err) {
 		throw new UnauthorizedError("incorrect email or password");
 	}
-	if (!isAuth) throw new UnauthorizedError("incorrect email or password");
+	if (!isAuthorized) throw new UnauthorizedError("incorrect email or password");
 
 	//returns res type with password omitted
 	res.status(200).send({
