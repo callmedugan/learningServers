@@ -5,6 +5,7 @@ import postgres from "postgres";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { createUser, deleteAll } from "./db/queries/users.js";
+import { createChirp } from "./db/queries/chirps.js";
 
 const app = express();
 const PORT = 8080;
@@ -102,24 +103,45 @@ async function handlerCreateUser(req: Request, res: Response) {
 	});
 }
 
-//handler to validate that a chirp is 140 chars or less
-async function handlerValidateChirp(req: Request, res: Response) {
+async function handlerCreateChirp(req: Request, res: Response) {
 	//define shape
 	type Shape = {
 		body: string;
+		userId: string;
 	};
 
-	//get parsed body
+	//get parsed data
 	const parse: Shape = req.body;
 
-	//handle the parsed data
-	if (parse?.body.length > 140) {
-		throw new BadRequestError("Chirp is too long. Max length is 140");
-	} else {
-		res.status(200).send({
-			cleanedBody: getCleanedChirp(parse.body),
-		});
+	//validate fields
+	if (
+		!parse.body ||
+		!parse.userId ||
+		parse.body === "" ||
+		parse.userId === ""
+	) {
+		throw new BadRequestError("Invalid Chirp data");
 	}
+	//check length
+	if (parse.body.length > 140) {
+		throw new BadRequestError("Chirp is too long. Max length is 140");
+	}
+	//data is good
+	const result = await createChirp({
+		body: getCleanedChirp(parse.body),
+		userId: parse.userId,
+	});
+	if (result == undefined) {
+		throw new Error("something went wrong creating the Chirp");
+	}
+	//return 201 post success and the result as in js obj format
+	res.status(201).send({
+		id: result.id,
+		createdAt: result.createdAt,
+		updatedAt: result.updatedAt,
+		body: result.body,
+		userId: result.userId,
+	});
 }
 
 async function errorHandler(
@@ -213,8 +235,8 @@ async function main() {
 
 	//api
 	app.get("/api/healthz", handlerReadiness);
-	app.post("/api/validate_chirp", handlerValidateChirp);
 	app.post("/api/users", handlerCreateUser);
+	app.post("/api/chirps", handlerCreateChirp);
 
 	//serves the index.html etc. from the path given
 	app.use("/app", express.static("./src/app"));
