@@ -4,12 +4,13 @@ import { config } from "./config.js";
 import postgres from "postgres";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { drizzle } from "drizzle-orm/postgres-js";
-import { createUser, deleteAll } from "./db/queries/users.js";
+import { createUser, deleteAll, getUserByEmail } from "./db/queries/users.js";
 import {
 	createChirp,
 	getAllChirps,
 	getChirpById,
 } from "./db/queries/chirps.js";
+import { checkPasswordHash, hashPassword } from "./db/auth.js";
 
 const app = express();
 const PORT = 8080;
@@ -80,25 +81,74 @@ async function handlerReset(req: Request, res: Response) {
 	}
 }
 
-async function handlerCreateUser(req: Request, res: Response) {
+async function handlerLogin(req: Request, res: Response) {
 	//define shape
 	type Shape = {
 		email: string;
+		password: string;
 	};
 
 	//get parsed body
 	const parse: Shape = req.body;
 
 	//handle the parsed data
-	if (!parse.email || parse.email === "") {
+	if (!parse.email || parse.email === "")
 		throw new BadRequestError("Email cannot be blank");
+	if (!parse.password || parse.password === "")
+		throw new BadRequestError("Password cannot be blank");
+
+	//hash provided password
+	const user = await getUserByEmail(parse.email);
+	if (user == undefined || user.hashedPassword == undefined)
+		throw new UnauthorizedError("incorrect email or password");
+
+	//auth
+	let isAuth = false;
+	try {
+		isAuth = await checkPasswordHash(parse.password, user.hashedPassword);
+	} catch (err) {
+		throw new UnauthorizedError("incorrect email or password");
 	}
+	if (!isAuth) throw new UnauthorizedError("incorrect email or password");
+
+	//returns res type with password omitted
+	res.status(200).send({
+		id: user.id,
+		email: user.email,
+		createdAt: user.createdAt,
+		updatedAt: user.updatedAt,
+	});
+}
+
+async function handlerCreateUser(req: Request, res: Response) {
+	//define shape
+	type Shape = {
+		email: string;
+		password: string;
+	};
+
+	//get parsed body
+	const parse: Shape = req.body;
+
+	//handle the parsed data
+	if (!parse.email || parse.email === "")
+		throw new BadRequestError("Email cannot be blank");
+	if (!parse.password || parse.password === "")
+		throw new BadRequestError("Password cannot be blank");
+
 	//result
-	const result = await createUser({ email: parse.email });
+	const hashedPassword = await hashPassword(parse.password);
+
+	//result
+	const result = await createUser({
+		email: parse.email,
+		hashedPassword: hashedPassword,
+	});
 	if (result == undefined) {
 		throw new Error("something went wrong creating the user");
 	}
-	//return 201 status with result
+
+	//return 201 status with password omitted
 	res.status(201).send({
 		id: result.id,
 		email: result.email,
@@ -281,6 +331,9 @@ async function main() {
 	//api
 	app.get("/api/healthz", handlerReadiness);
 	app.post("/api/users", handlerCreateUser);
+	app.post("/api/login", handlerLogin);
+
+	//chirps
 	app.get("/api/chirps", handlerGetAllChirps);
 	app.get("/api/chirps/:chirpId", handlerGetChirpById);
 	app.post("/api/chirps", handlerCreateChirp);
