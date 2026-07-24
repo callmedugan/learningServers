@@ -1,7 +1,7 @@
 import { db } from "../index.js";
-import { NewUser, users } from "../schema.js";
+import { UserRecord, users } from "../schema.js";
 
-export async function createUser(user: NewUser) {
+export async function createUser(user: UserRecord) {
 	const [result] = await db
 		.insert(users)
 		.values(user)

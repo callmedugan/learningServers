@@ -5,7 +5,8 @@ import postgres from "postgres";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { createUser, deleteAll } from "./db/queries/users.js";
-import { createChirp } from "./db/queries/chirps.js";
+import { createChirp, getAllChirps } from "./db/queries/chirps.js";
+import { ChirpRecord } from "./db/schema.js";
 
 const app = express();
 const PORT = 8080;
@@ -101,6 +102,25 @@ async function handlerCreateUser(req: Request, res: Response) {
 		createdAt: result.createdAt,
 		updatedAt: result.updatedAt,
 	});
+}
+
+async function handlerGetAllChirps(req: Request, res: Response) {
+	//query
+	const chirps = await getAllChirps();
+	const result = [];
+	//build result structure
+	for (const c of chirps) {
+		result.push({
+			id: c.id,
+			createdAt: c.createdAt,
+			updatedAt: c.updatedAt,
+			body: c.body,
+			userId: c.userId,
+		});
+	}
+	//success
+	res.status(200);
+	res.send(result);
 }
 
 async function handlerCreateChirp(req: Request, res: Response) {
@@ -236,6 +256,7 @@ async function main() {
 	//api
 	app.get("/api/healthz", handlerReadiness);
 	app.post("/api/users", handlerCreateUser);
+	app.get("/api/chirps", handlerGetAllChirps);
 	app.post("/api/chirps", handlerCreateChirp);
 
 	//serves the index.html etc. from the path given

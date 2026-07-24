@@ -24,5 +24,5 @@ export const chirps = pgTable("chirps", {
 });
 
 //infers the type of a row based on the table
-export type NewUser = typeof users.$inferInsert;
-export type NewChirp = typeof chirps.$inferInsert;
+export type UserRecord = typeof users.$inferInsert;
+export type ChirpRecord = typeof chirps.$inferInsert;
